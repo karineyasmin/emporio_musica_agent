@@ -11,20 +11,17 @@ router = APIRouter(tags=["Health"])
 
 @router.get("/health", status_code=status.HTTP_200_OK)
 async def health_check():
-    """Liveness probe: verifies that the application is running."""
+    """Liveness probe: verifies that the FastAPI application is alive."""
     return {"status": "healthy", "service": "emporio-musica-api"}
 
 
 @router.get("/ready", status_code=status.HTTP_200_OK)
 async def readiness_check():
-    """Readiness probe: validates external dependencies such as the database."""
-    db_status = "connected"
+    """Readiness probe: validates database connectivity."""
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
+        return {"status": "ready", "database": "connected"}
     except Exception as exc:
         logger.error(f"Database readiness check failed: {str(exc)}")
-        db_status = "unavailable"
-        return {"status": "unhealthy", "database": db_status}
-
-    return {"status": "ready", "database": db_status}
+        return {"status": "unhealthy", "database": "unavailable"}

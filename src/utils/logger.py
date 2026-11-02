@@ -24,7 +24,7 @@ class JSONFormatter(logging.Formatter):
             log_payload["exception"] = self.formatException(record.exc_info)
 
         if hasattr(record, "extra_fields"):
-            log_payload.update(record.extra_fields)
+            log_payload.update(record.extra_fields)  # type: ignore
 
         return json.dumps(log_payload, ensure_ascii=False)
 

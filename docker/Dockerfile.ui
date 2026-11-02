@@ -5,7 +5,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir streamlit httpx
 
 COPY src/ui ./src/ui
-COPY src/config.py ./src/config.py
+COPY src/config/config.py ./src/config/config.py
 
 EXPOSE 8501
 
