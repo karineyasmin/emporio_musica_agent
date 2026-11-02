@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir streamlit httpx
+
+COPY src/ui ./src/ui
+COPY src/config.py ./src/config.py
+
+EXPOSE 8501
+
+CMD ["streamlit", "run", "src/ui/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
