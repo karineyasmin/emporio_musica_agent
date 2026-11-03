@@ -1,8 +1,12 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.connection import Base
-from src.database.models.order import Order
+
+if TYPE_CHECKING:
+    from src.database.models.order import Order
 
 
 class Customer(Base):

@@ -21,6 +21,7 @@ dependencies = [
     "pydantic-settings>=2.16.2",
     "pypdf>=6.21.4",
     "python-dotenv>=1.2.4",
+    "sentence-transformers>=5.2.0",
     "sqlalchemy>=2.1.6",
     "streamlit>=1.66.1",
     "uvicorn[standard]>=0.54.0",

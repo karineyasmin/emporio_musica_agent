@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import (
     Integer,
     String,
@@ -6,7 +8,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.connection import Base
-from src.database.models.product import Product
+
+if TYPE_CHECKING:
+    from src.database.models.product import Product
 
 
 class Category(Base):

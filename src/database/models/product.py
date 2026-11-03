@@ -1,13 +1,16 @@
 from datetime import date
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Date, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.connection import Base
-from src.database.models.category import Category
-from src.database.models.order import OrderItem
-from src.database.models.promotion import Promotion
+
+if TYPE_CHECKING:
+    from src.database.models.category import Category
+    from src.database.models.order import OrderItem
+    from src.database.models.promotion import Promotion
 
 
 class Product(Base):
