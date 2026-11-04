@@ -1,13 +1,15 @@
 """Chat API endpoints handling agent interactions."""
 
-from collections.abc import Mapping, Sequence
+import json
+from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
+from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 
 from src.agent.graph import agent_executor
-from src.api.schemas import ChatRequest, ChatResponse
+from src.api.schemas import ChatRequest
 from src.utils.logger import logger
 
 chat_router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -35,37 +37,56 @@ def _content_to_text(content: Any) -> str:
     return str(content)
 
 
-@chat_router.post("", response_model=ChatResponse, status_code=status.HTTP_200_OK)
+def _sse_event(event_type: str, **data: str) -> str:
+    """Serialize one server-sent event as JSON."""
+    return f"data: {json.dumps({'type': event_type, **data}, ensure_ascii=False)}\n\n"
+
+
+async def _stream_agent_response(payload: ChatRequest) -> AsyncIterator[str]:
+    """Stream text chunks produced by the LangGraph agent."""
+    config = {"configurable": {"thread_id": payload.session_id}}
+    initial_state = {"messages": [HumanMessage(content=payload.message)]}
+    streamed_text = False
+
+    try:
+        async for message, metadata in agent_executor.astream(
+            initial_state,
+            config=config,
+            stream_mode="messages",
+        ):
+            if metadata.get("langgraph_node") != "agent":
+                continue
+
+            text = _content_to_text(message.content)
+            if text:
+                streamed_text = True
+                yield _sse_event("token", content=text)
+
+        if not streamed_text:
+            raise RuntimeError("The agent returned an empty response.")
+
+        yield _sse_event("done", session_id=payload.session_id)
+    except Exception as exc:
+        logger.error(f"Error streaming chat turn: {str(exc)}", exc_info=True)
+        yield _sse_event("error", detail=f"Erro ao processar a mensagem: {exc}")
+
+
+@chat_router.post("", status_code=status.HTTP_200_OK)
 async def send_message(payload: ChatRequest):
-    """Receives customer messages and returns responses processed by the agent.
+    """Streams the agent response using Server-Sent Events.
 
     Args:
         payload: Input message and session identifier.
 
     Returns:
-        ChatResponse: Structured response containing agent reply.
+        StreamingResponse: SSE stream with token, done, or error events.
     """
     logger.info(
         f"[POST /chat] Session: {payload.session_id} | Message: '{payload.message}'"
     )
 
-    try:
-        config = {"configurable": {"thread_id": payload.session_id}}
-        initial_state = {"messages": [HumanMessage(content=payload.message)]}
-
-        # Execute cyclical graph until resolution
-        final_state = agent_executor.invoke(initial_state, config=config)
-        agent_reply = _content_to_text(final_state["messages"][-1].content).strip()
-        if not agent_reply:
-            raise RuntimeError("The agent returned an empty response.")
-
-        return ChatResponse(
-            response=agent_reply,
-            session_id=payload.session_id,
-        )
-    except Exception as exc:
-        logger.error(f"Error handling chat turn: {str(exc)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred while processing the request: {str(exc)}",
-        ) from exc
+    return StreamingResponse(
+        _stream_agent_response(payload),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

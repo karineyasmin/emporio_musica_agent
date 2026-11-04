@@ -7,10 +7,11 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from src.agent.llm import get_llm
+from src.agent.llm import get_fallback_llm, get_llm
 from src.agent.prompts import SYSTEM_PROMPT
 from src.agent.state import AgentState
 from src.agent.tools import ALL_TOOLS
+from src.config.config import settings
 from src.utils.logger import logger
 
 
@@ -31,7 +32,26 @@ def call_model(state: AgentState) -> dict:
     if not messages or not isinstance(messages[0], SystemMessage):
         messages = [SystemMessage(content=SYSTEM_PROMPT)] + messages
 
-    response = llm.invoke(messages)
+    try:
+        response = llm.invoke(messages)
+    except Exception as primary_error:
+        if not settings.GOOGLE_API_KEY:
+            raise
+
+        logger.warning(
+            "Primary LLM failed during inference; retrying with Ollama fallback: "
+            f"{primary_error}"
+        )
+        try:
+            response = get_fallback_llm(ALL_TOOLS).invoke(messages)
+        except Exception as fallback_error:
+            logger.error(
+                f"Both primary and fallback LLMs failed: {fallback_error}",
+                exc_info=True,
+            )
+            raise RuntimeError(
+                "The primary and fallback language models are unavailable."
+            ) from fallback_error
     return {"messages": [response]}
 
 

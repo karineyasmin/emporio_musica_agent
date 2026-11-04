@@ -1,5 +1,6 @@
 """Streamlit frontend for the Emporio da Musica customer assistant."""
 
+import json
 import os
 from uuid import uuid4
 
@@ -32,21 +33,37 @@ def check_api_status() -> tuple[bool, str]:
     return True, "API conectada"
 
 
-def send_message(message: str) -> str:
-    """Send a message to the API and return the assistant response."""
+def stream_message(message: str):
+    """Yield assistant text chunks from the API's SSE response."""
     payload = {
         "message": message,
         "session_id": st.session_state.session_id,
     }
 
     try:
-        response = httpx.post(
+        with httpx.stream(
+            "POST",
             CHAT_ENDPOINT,
             json=payload,
             timeout=REQUEST_TIMEOUT,
-        )
-        response.raise_for_status()
-        data = response.json()
+        ) as response:
+            response.raise_for_status()
+            for line in response.iter_lines():
+                if not line or not line.startswith("data: "):
+                    continue
+
+                event = line[6:]
+                try:
+                    data = json.loads(event)
+                except ValueError as exc:
+                    raise RuntimeError("A API retornou um evento inválido.") from exc
+
+                if data.get("type") == "token":
+                    content = data.get("content")
+                    if isinstance(content, str):
+                        yield content
+                elif data.get("type") == "error":
+                    raise RuntimeError(data.get("detail", "Erro desconhecido na API."))
     except httpx.HTTPStatusError as exc:
         detail = exc.response.text
         raise RuntimeError(
@@ -54,14 +71,6 @@ def send_message(message: str) -> str:
         ) from exc
     except httpx.RequestError as exc:
         raise RuntimeError(f"Não foi possível contactar a API: {exc}") from exc
-    except ValueError as exc:
-        raise RuntimeError("A API retornou uma resposta inválida.") from exc
-
-    assistant_response = data.get("response")
-    if not isinstance(assistant_response, str) or not assistant_response.strip():
-        raise RuntimeError("A API não retornou uma resposta de texto válida.")
-
-    return assistant_response
 
 
 def render_sidebar() -> None:
@@ -136,17 +145,22 @@ def main() -> None:
         st.markdown(user_message)
 
     with st.chat_message("assistant"):
-        with st.spinner("Consultando o assistente..."):
-            try:
-                assistant_message = send_message(user_message)
-            except RuntimeError as exc:
-                st.error(str(exc))
-                return
+        response_placeholder = st.empty()
+        assistant_parts = []
+        try:
+            with st.spinner("Consultando o assistente..."):
+                for chunk in stream_message(user_message):
+                    assistant_parts.append(chunk)
+                    response_placeholder.markdown("".join(assistant_parts))
+        except RuntimeError as exc:
+            st.error(str(exc))
+            return
 
-        st.markdown(assistant_message)
-        st.session_state.messages.append(
-            {"role": "assistant", "content": assistant_message}
-        )
+        assistant_message = "".join(assistant_parts).strip()
+        if assistant_message:
+            st.session_state.messages.append(
+                {"role": "assistant", "content": assistant_message}
+            )
 
 
 if __name__ == "__main__":

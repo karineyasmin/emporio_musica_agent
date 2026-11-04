@@ -32,3 +32,16 @@ def test_get_llm_uses_ollama_when_google_key_is_missing():
         temperature=0.2,
     )
     assert result is fake_bound_llm
+
+
+def test_get_fallback_llm_builds_ollama_client():
+    from src.agent.llm import get_fallback_llm
+
+    fake_bound_llm = Mock(name="ollama_bound")
+    fake_ollama = Mock()
+    fake_ollama.return_value.bind_tools.return_value = fake_bound_llm
+
+    with patch("src.agent.llm.ChatOllama", fake_ollama):
+        result = get_fallback_llm([])
+
+    assert result is fake_bound_llm

@@ -36,7 +36,11 @@ def get_llm(tools: list) -> BaseChatModel:
             f"Failed to initialize Gemini model: {exc}. Falling back to Ollama."
         )
 
-    # Local fallback via Ollama container
+    return get_fallback_llm(tools)
+
+
+def get_fallback_llm(tools: list) -> BaseChatModel:
+    """Build the local Ollama model used when the primary provider is unavailable."""
     fallback_llm = ChatOllama(
         base_url=settings.OLLAMA_BASE_URL,
         model=settings.OLLAMA_MODEL,
