@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.routes.health import router as health_router
+from src.api.routes.chat import chat_router
+from src.api.routes.health import health_router
 from src.config.config import settings
 from src.database.connection import init_db
 from src.utils.logger import logger
@@ -38,3 +39,4 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
+app.include_router(chat_router)

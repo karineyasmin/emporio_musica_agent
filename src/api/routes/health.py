@@ -6,16 +6,16 @@ from sqlalchemy import text
 from src.database.connection import engine
 from src.utils.logger import logger
 
-router = APIRouter(tags=["Health"])
+health_router = APIRouter(tags=["Health"])
 
 
-@router.get("/health", status_code=status.HTTP_200_OK)
+@health_router.get("/health", status_code=status.HTTP_200_OK)
 async def health_check():
     """Liveness probe: verifies that the FastAPI application is alive."""
     return {"status": "healthy", "service": "emporio-musica-api"}
 
 
-@router.get("/ready", status_code=status.HTTP_200_OK)
+@health_router.get("/ready", status_code=status.HTTP_200_OK)
 async def readiness_check():
     """Readiness probe: validates database connectivity."""
     try:
