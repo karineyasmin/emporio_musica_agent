@@ -22,14 +22,23 @@ Base = declarative_base()
 
 
 def init_db() -> None:
-    """Initializes extensions such as pgvector and checks connectivity."""
+    """Initializes database extensions, schema, and connectivity."""
     try:
         with engine.connect() as conn:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
             conn.commit()
-            logger.info(
-                "Extension 'vector' enabled and database connectivity verified."
-            )
+        from src.database.models.category import Category
+        from src.database.models.customer import Customer
+        from src.database.models.order import Order, OrderItem
+        from src.database.models.product import Product
+        from src.database.models.promotion import Promotion
+
+        _ = (Category, Customer, Order, OrderItem, Product, Promotion)
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database schema verified.")
+        logger.info(
+            "Extension 'vector' enabled and database connectivity verified."
+        )
     except Exception as exc:
         logger.error(f"Failed to initialize database extension or connect: {str(exc)}")
         raise exc

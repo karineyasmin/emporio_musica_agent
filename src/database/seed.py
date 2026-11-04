@@ -60,11 +60,12 @@ def seed_relational_data():
 
 def seed_vector_data():
     """Parses politicas_da_loja.pdf and saves embeddings into pgvector."""
-    pdf_path = "data/politicas_da_loja.pdf"
-    if not os.path.exists(pdf_path):
-        logger.warning(f"PDF {pdf_path} not found. Skipping vector seeding.")
+    pdf_candidates = glob.glob("data/*pol*ticas*.pdf")
+    if not pdf_candidates:
+        logger.warning("No store policy PDF found. Skipping vector seeding.")
         return
 
+    pdf_path = pdf_candidates[0]
     logger.info("Loading policy manual into vector store...")
     loader = PyPDFLoader(pdf_path)
     docs = loader.load()
