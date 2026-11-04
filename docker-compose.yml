@@ -19,6 +19,33 @@ services:
       timeout: 5s
       retries: 5
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: emporio_ollama
+    restart: always
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  ollama-init:
+    image: curlimages/curl:8.11.1
+    container_name: emporio_ollama_init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - >
+        curl --fail --retry 10 --retry-delay 3
+        -X POST http://ollama:11434/api/pull
+        -H 'Content-Type: application/json'
+        -d '{"name":"qwen2.5:1.5b","stream":false}'
+
   api:
     build:
       context: .
@@ -32,6 +59,7 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=emporio_db
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OLLAMA_BASE_URL=http://ollama:11434
     ports:
       - "8000:8000"
     volumes:
@@ -39,6 +67,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
@@ -63,3 +93,4 @@ services:
 
 volumes:
   postgres_data:
+  ollama_data:

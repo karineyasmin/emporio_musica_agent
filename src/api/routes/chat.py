@@ -30,6 +30,7 @@ def _content_to_text(content: Any) -> str:
         text = content.get("text")
         if isinstance(text, str):
             return text
+        return ""
 
     return str(content)
 
